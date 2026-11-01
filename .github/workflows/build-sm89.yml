@@ -7,6 +7,8 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 350
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,10 +19,21 @@ jobs:
           cuda: '13.3.0'
           method: 'network'
 
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja and vcpkg
+        shell: pwsh
+        run: |
+          choco install ninja -y --no-progress
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
+          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+
       - name: Build ninfer-serve (sm_89, clean dir)
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           set "PATH=%CUDA_PATH%\bin;%PATH%"
           set "CUDACXX=%CUDA_PATH%\bin\nvcc.exe"
           cmake -S src-tree\fusion-engine-src -B build-89 -G Ninja ^
