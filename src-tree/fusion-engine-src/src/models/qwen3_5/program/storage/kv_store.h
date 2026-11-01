@@ -1097,7 +1097,9 @@ public:
         return activation.page_reservation_;
     }
 
-    void commit_activation(KVActivationReservation&& activation, RankStreams stream = {}) {
+    void commit_activation(KVActivationReservation&& activation, RankStreams stream) {
+        // Stream is required: a defaulted RankStreams{} is the legacy stream 0, and publishing the
+        // block table there races the compute streams (upstream ninfer issue #210/#320).
         if (activation.owner_ != this) {
             throw std::logic_error("KV activation reservation belongs to another store");
         }
@@ -1308,7 +1310,7 @@ public:
         pages_->physical_pool().resize_reservation(fork.page_reservation_, growth);
     }
 
-    void commit_prefix_fork(KVPrefixForkReservation&& fork, RankStreams stream = {}) {
+    void commit_prefix_fork(KVPrefixForkReservation&& fork, RankStreams stream) {
         require_prefix_fork(fork);
         Address& source                    = require(fork.source_);
         Address& destination               = require(fork.destination_);
@@ -1457,7 +1459,7 @@ public:
     }
 
     void commit_page_prefix_fork(KVPagePrefixForkReservation&& fork,
-                                 cudaStream_t stream = nullptr) {
+                                 cudaStream_t stream) {
         require_page_prefix_fork(fork);
         Address& destination               = require(fork.destination_);
         const auto full                    = static_cast<std::uint32_t>(fork.full_pages_.size());
@@ -1641,7 +1643,7 @@ public:
     }
 
     void commit_active_snapshot(KVActiveSnapshotReservation&& snapshot,
-                                RankStreams stream = {}) {
+                                RankStreams stream) {
         require_active_snapshot(snapshot);
         Address& source      = require_active(snapshot.source_);
         Address& destination = require(snapshot.destination_);
@@ -1769,7 +1771,7 @@ public:
     [[nodiscard]] bool restore_page_from_host(KVAddressSpaceHandle handle, std::uint32_t page,
                                               HostKVAllocationConstView source,
                                               DeviceKVPageReservation& reservation,
-                                              cudaStream_t stream = nullptr) {
+                                              cudaStream_t stream) {
         Address& address = require_active(handle);
         if (page >= address.page_count || !address.row) { return false; }
         const LogicalKVPageHandle logical = membership(address, page);
@@ -1794,7 +1796,7 @@ public:
     // Coverage is a lower bound. A speculative mapping may already extend beyond this stage's
     // needs; only an explicit truncate releases it, and commit_frontier publishes valid tokens.
     void ensure_mapped_to_tokens(KVAddressSpaceHandle handle, std::uint32_t tokens,
-                                 RankStreams stream = {}) {
+                                 RankStreams stream) {
         Address& address           = require_active(handle);
         const std::uint32_t target = pages_for_tokens(tokens);
         if (target > entitlement(address)) {
@@ -2214,7 +2216,7 @@ private:
         return memberships_[index * page_capacity_ + page];
     }
 
-    void publish_membership(const Address& address, RankStreams stream = {}) {
+    void publish_membership(const Address& address, RankStreams stream) {
         if (!address.row) { throw std::logic_error("KV address space has no execution row"); }
         publish_scratch_.clear();
         for (std::uint32_t page = 0; page < address.page_count; ++page) {
@@ -2230,7 +2232,7 @@ private:
     // the ring's mask is for: "The mask IS the resident set, so a page that could not be demoted or
     // restored can only be hidden; it can never expose a stale Device slot"
     // (program\storage\context.cpp:2185-2186).
-    void publish_membership_resident_runs(const Address& address, RankStreams stream = {}) {
+    void publish_membership_resident_runs(const Address& address, RankStreams stream) {
         if (!address.row) { throw std::logic_error("KV address space has no execution row"); }
         std::uint32_t page = 0;
         while (page < address.page_count) {
