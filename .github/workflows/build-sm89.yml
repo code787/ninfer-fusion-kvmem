@@ -26,7 +26,7 @@ jobs:
         shell: pwsh
         run: |
           choco install ninja -y --no-progress
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
+          git clone https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
           & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
 
       - name: Build ninfer-serve (sm_89, clean dir)
