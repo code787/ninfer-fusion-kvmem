@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install CUDA 13.3
-        uses: jimver/cuda-toolkit@v2
+        uses: jimver/cuda-toolkit@v0.2.36
         with:
           cuda: '13.3.0'
           method: 'network'
