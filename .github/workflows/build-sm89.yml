@@ -28,6 +28,14 @@ jobs:
           choco install ninja -y --no-progress
           git clone https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
           & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\vcpkg-cache" | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$env:GITHUB_WORKSPACE\vcpkg-cache" >> $env:GITHUB_ENV
+
+      - name: vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\vcpkg-cache
+          key: vcpkg-x64-windows-manifest-v1
 
       - name: Build ninfer-serve (sm_89, clean dir)
         shell: cmd
@@ -46,12 +54,21 @@ jobs:
           if errorlevel 1 exit /b 1
           cmake --build build-89 --target ninfer-serve -j 4
 
-      - name: Collect binary
-        shell: cmd
-        run: copy /Y build-89\apps\ninfer-serve.exe ninfer-serve-89-streamfix.exe
+      - name: Collect binary + runtime DLLs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build-89\apps\ninfer-serve.exe dist\ninfer-serve-89-streamfix.exe
+          $vpkg = "build-89\vcpkg_installed\x64-windows\bin"
+          if (Test-Path $vpkg) { Copy-Item "$vpkg\*.dll" dist -ErrorAction SilentlyContinue }
+          Get-ChildItem dist | Select-Object Name, Length
+          foreach ($d in "cublas64_13.dll","cublasLt64_13.dll") {
+            $src = Join-Path $env:CUDA_PATH "bin\$d"
+            if ((Test-Path $src) -and -not (Test-Path "dist\$d")) { Copy-Item $src dist }
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ninfer-serve-89-streamfix
-          path: ninfer-serve-89-streamfix.exe
+          path: dist\*
