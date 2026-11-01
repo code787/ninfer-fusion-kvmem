@@ -1,0 +1,44 @@
+name: build-sm89-windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install CUDA 13.3
+        uses: jimver/cuda-toolkit@v2
+        with:
+          cuda: '13.3.0'
+          method: 'network'
+
+      - name: Build ninfer-serve (sm_89, clean dir)
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set "PATH=%CUDA_PATH%\bin;%PATH%"
+          set "CUDACXX=%CUDA_PATH%\bin\nvcc.exe"
+          cmake -S src-tree\fusion-engine-src -B build-89 -G Ninja ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCMAKE_CUDA_ARCHITECTURES=89 ^
+            -DCMAKE_CUDA_COMPILER=%CUDACXX% ^
+            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows ^
+            -DNINFER_BUILD_APPS=ON -DBUILD_TESTING=OFF -DNINFER_BUILD_BENCHMARKS=OFF
+          if errorlevel 1 exit /b 1
+          cmake --build build-89 --target ninfer-serve -j 4
+
+      - name: Collect binary
+        shell: cmd
+        run: copy /Y build-89\apps\ninfer-serve.exe ninfer-serve-89-streamfix.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ninfer-serve-89-streamfix
+          path: ninfer-serve-89-streamfix.exe
