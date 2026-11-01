@@ -7,8 +7,6 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 350
-    env:
-      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,11 +34,13 @@ jobs:
         run: |
           set "PATH=%CUDA_PATH%\bin;%PATH%"
           set "CUDACXX=%CUDA_PATH%\bin\nvcc.exe"
+          where ninja
+          where cl
           cmake -S src-tree\fusion-engine-src -B build-89 -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DCMAKE_CUDA_ARCHITECTURES=89 ^
-            -DCMAKE_CUDA_COMPILER=%CUDACXX% ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_CUDA_COMPILER="%CUDACXX%" ^
+            -DCMAKE_TOOLCHAIN_FILE="%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake" ^
             -DVCPKG_TARGET_TRIPLET=x64-windows ^
             -DNINFER_BUILD_APPS=ON -DBUILD_TESTING=OFF -DNINFER_BUILD_BENCHMARKS=OFF
           if errorlevel 1 exit /b 1
