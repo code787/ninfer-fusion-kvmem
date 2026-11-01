@@ -323,15 +323,18 @@ public:
     // Data movement. Each plane's copy is issued on the stream of the rank that holds it, so the
     // work for a page group fans out across ranks and the caller fences on all of them. The host
     // image of a page keeps the full plane inventory: ranks write disjoint plane ranges of it.
-    void zero_pages(std::span<const DeviceKVPageHandle> pages, RankStreams streams = {}) const;
+    // Streams are required everywhere below: a defaulted RankStreams{} is the legacy stream 0, and
+    // issuing copies or publishing the block table there races the compute streams
+    // (upstream ninfer issues #210/#320).
+    void zero_pages(std::span<const DeviceKVPageHandle> pages, RankStreams streams) const;
     void copy_page(DeviceKVPageHandle source, DeviceKVPageHandle destination,
-                   RankStreams streams = {}) const;
+                   RankStreams streams) const;
 
     void copy_to_host(std::span<const DeviceKVPageHandle> source, HostKVAllocationView destination,
-                      RankStreams streams = {}) const;
+                      RankStreams streams) const;
     void copy_from_host(HostKVAllocationConstView source,
                         std::span<const DeviceKVPageHandle> destination,
-                        RankStreams streams = {}) const;
+                        RankStreams streams) const;
     // Record-addressed forms for caller-owned pinned host memory: page i is packed with `layout`
     // at records[i]. Runs of consecutive physical pages whose records advance by one constant
     // pitch are copied as one strided transfer per plane. A strided transfer must stay inside one
@@ -341,11 +344,11 @@ public:
     void copy_to_host_records(std::span<const DeviceKVPageHandle> source,
                               std::span<std::byte* const> records,
                               std::span<const std::uint32_t> record_groups,
-                              const HostKVPageLayout& layout, RankStreams streams = {}) const;
+                              const HostKVPageLayout& layout, RankStreams streams) const;
     void copy_from_host_records(std::span<const std::byte* const> records,
                                 std::span<const std::uint32_t> record_groups,
                                 std::span<const DeviceKVPageHandle> destination,
-                                const HostKVPageLayout& layout, RankStreams streams = {}) const;
+                                const HostKVPageLayout& layout, RankStreams streams) const;
     // The same restricted to planes [plane_begin, plane_end), so a caller can order the planes a
     // consumer needs first (a model's per-layer planes) ahead of the rest.
     void copy_from_host_records(std::span<const std::byte* const> records,
@@ -478,11 +481,11 @@ public:
 
     // Each copy is written on the stream of the rank that holds it.
     void publish(KVExecutionRowHandle row, std::uint32_t logical_begin,
-                 std::span<const DeviceKVPageHandle> pages, RankStreams streams = {});
+                 std::span<const DeviceKVPageHandle> pages, RankStreams streams);
     void publish(KVExecutionRowHandle row, std::uint32_t logical_begin,
-                 std::span<const DeviceKVPageLease> pages, RankStreams streams = {});
+                 std::span<const DeviceKVPageLease> pages, RankStreams streams);
     void publish_repeated(KVExecutionRowHandle row, DeviceKVPageHandle page, std::uint32_t count,
-                          RankStreams streams = {});
+                          RankStreams streams);
 
     // The row and matrix as rank `rank` sees them. Throws if that rank holds no copy.
     [[nodiscard]] Tensor row(KVExecutionRowHandle handle, std::size_t rank = 0) const;
